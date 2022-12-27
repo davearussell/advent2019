@@ -10,7 +10,10 @@ url=https://adventofcode.com/${year}/day/${day}/input
 mkdir -p ${new_dir}
 cat > ${solve_py} <<EOF
 #! /usr/bin/python3
-import sys
+import os, sys
+MYDIR = os.path.realpath(os.path.dirname(__file__))
+sys.path.append(os.path.dirname(MYDIR))
+import intcode
 
 
 def main(input_file):
