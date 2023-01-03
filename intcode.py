@@ -5,6 +5,10 @@ class HaltExecution(Exception):
     pass
 
 
+class BlockedOnInput(Exception):
+    pass
+
+
 POS, IMM = range(2)
 class Op:
     opcode = None
@@ -96,6 +100,8 @@ class Input(Op):
     n_outputs = 1
 
     def run(self):
+        if not self.process.inputs:
+            raise BlockedOnInput()
         self.output(0, self.process.inputs.pop(0))
 
     def __repr__(self):
@@ -170,16 +176,23 @@ class Process:
         self.outputs = []
         self.mem = mem
         self.ctr = 0
+        self.state = 'new'
 
     def __repr__(self):
-        return "%s(%d, c=%d)" % (type(self).__name__, self.idx, self.ctr)
+        return "%s(%d, c=%d, state=%r)" % (type(self).__name__, self.idx, self.ctr, self.state)
 
     def dbg(self, *args):
         if self.verbose:
             print(' '.join([str(arg) for arg in [self] + list(args)]))
 
-    def run(self):
-        self.dbg("start")
+    def run(self, inputs=None):
+        if isinstance(inputs, int):
+            self.inputs.append(inputs)
+        elif inputs:
+            self.inputs += inputs
+        if self.state == 'new':
+            self.dbg("start")
+        self.state = 'running'
         while True:
             mode_mask, opcode = divmod(self.mem[self.ctr], 100)
             op_type = Op.get(opcode)
@@ -189,6 +202,10 @@ class Process:
             try:
                 op.run()
             except HaltExecution:
+                self.state = 'done'
+                break
+            except BlockedOnInput:
+                self.dbg("blocked on input")
                 break
             self.ctr += 1 + op_type.n_args
 
