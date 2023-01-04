@@ -9,7 +9,7 @@ class BlockedOnInput(Exception):
     pass
 
 
-POS, IMM = range(2)
+POS, IMM, REL = range(3)
 class Op:
     opcode = None
     n_args = 0
@@ -32,20 +32,28 @@ class Op:
         v = self.args[i]
         if self.modes[i] == IMM:
             return v
-        return self.process.mem[v]
+        if self.modes[i] == REL:
+            v += self.process.rel_base
+        return self.process.mem.get(v, 0)
 
     def format_arg(self, i):
         v = self.args[i]
         if self.modes[i] == IMM:
             return str(v)
-        s = "r%d" % v
+        if self.modes[i] == POS:
+            s = "r%d" % v
+        else:
+            s = "r(%d+%d=%d)" % (v, self.process.rel_base, v + self.process.rel_base)
+            v += self.process.rel_base
         if i < (self.n_args - self.n_outputs):
-            s += "(%d)" % self.process.mem[v]
-        return s
+            s += "(%d)" % self.process.mem.get(v, 0)
 
     def output(self, i, val):
         assert self.modes[i] != IMM
-        self.process.mem[self.args[i]] = val
+        addr = self.args[i]
+        if self.modes[i] == REL:
+            addr += self.process.rel_base
+        self.process.mem[addr] = val
 
     def run(self):
         raise NotImplementedError()
@@ -155,6 +163,17 @@ class EQ(Infix):
     symbol = '=='
 
 
+class RelAdj(Op):
+    opcode = 9
+    n_args = 1
+
+    def run(self):
+        self.process.rel_base += self.input(0)
+
+    def __repr__(self):
+        return "RELADJ(%s)" % (self.format_arg(0),)
+
+
 class Halt(Op):
     opcode = 99
 
@@ -176,6 +195,7 @@ class Process:
         self.outputs = []
         self.mem = mem
         self.ctr = 0
+        self.rel_base = 0
         self.state = 'new'
 
     def __repr__(self):
