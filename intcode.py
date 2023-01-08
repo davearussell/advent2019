@@ -205,10 +205,20 @@ class Process:
         if self.verbose:
             print(' '.join([str(arg) for arg in [self] + list(args)]))
 
+    def write_stdin(self, text):
+        self.inputs += [ord(c) for c in text]
+
+    def read_stdout(self):
+        text = ''.join(map(chr, self.outputs))
+        self.outputs.clear()
+        return text
+
     def run(self, inputs=None):
         if isinstance(inputs, int):
             self.inputs.append(inputs)
         elif inputs:
+            if isinstance(inputs, str):
+                inputs = [ord(c) for c in inputs]
             self.inputs += inputs
         if self.state == 'new':
             self.dbg("start")
