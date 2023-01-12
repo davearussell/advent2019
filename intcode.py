@@ -1,11 +1,17 @@
+import copy
 import operator
 import os
+import time
 
 class HaltExecution(Exception):
     pass
 
 
 class BlockedOnInput(Exception):
+    pass
+
+
+class Timeout(Exception):
     pass
 
 
@@ -201,6 +207,17 @@ class Process:
     def __repr__(self):
         return "%s(%d, c=%d, state=%r)" % (type(self).__name__, self.idx, self.ctr, self.state)
 
+    def clone(self):
+        p = Process(self.mem.copy())
+        p.ctr = self.ctr
+        p.rel_base = self.rel_base
+        p.state = self.state
+        if self.inputs:
+            p.inputs = self.inputs.copy()
+        if self.outputs:
+            p.outputs = self.outputs.copy()
+        return p
+
     def dbg(self, *args):
         if self.verbose:
             print(' '.join([str(arg) for arg in [self] + list(args)]))
@@ -213,7 +230,9 @@ class Process:
         self.outputs.clear()
         return text
 
-    def run(self, inputs=None):
+    def run(self, inputs=None, timeout=None):
+        if timeout:
+            deadline = time.time() + timeout
         if isinstance(inputs, int):
             self.inputs.append(inputs)
         elif inputs:
@@ -238,6 +257,8 @@ class Process:
                 self.dbg("blocked on input")
                 break
             self.ctr += 1 + op_type.n_args
+            if timeout and time.time() > deadline:
+                raise Timeout()
 
 
 def run(mem, inputs=None):
